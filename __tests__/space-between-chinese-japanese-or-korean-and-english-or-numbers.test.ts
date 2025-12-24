@@ -261,4 +261,16 @@ describe('Space between CJK and English or numbers', () => {
     expect(once).toBe(after);
     expect(rule.apply(once)).toBe(once);
   });
+
+  it('does not match emphasis markers across blank lines', () => {
+    const before = dedent`
+      你要做的，是一个“特种武器供应商”**。
+
+      - **你的角色**： 拥有 C++/AI/数据分析能力的“技术取证专家”。
+    `;
+
+    const once = rule.apply(before);
+    expect(once).toBe(before);
+    expect(rule.apply(once)).toBe(once);
+  });
 });

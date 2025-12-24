@@ -18,6 +18,7 @@ type EmphasisReplacement = {
 const emphasisSpacingTriggerRegex = /[()（）"“”「」【】]/;
 const cjkCharRegex = /[\p{sc=Han}\p{sc=Katakana}\p{sc=Hiragana}\p{sc=Hangul}]/u;
 const cjkPunctuationRegex = /[。！？；：、，]/;
+const blankLineRegex = /\r?\n[ \t]*\r?\n/;
 
 function isEscaped(text: string, index: number): boolean {
   let backslashCount = 0;
@@ -56,8 +57,13 @@ function collectAsteriskEmphasisRanges(text: string, markerLength: number): Text
     if (openIndex == null) {
       openIndex = index;
     } else {
-      ranges.push({start: openIndex, end: index + markerLength});
-      openIndex = null;
+      const contentStart = openIndex + markerLength;
+      if (hasBlankLine(text, contentStart, index)) {
+        openIndex = index;
+      } else {
+        ranges.push({start: openIndex, end: index + markerLength});
+        openIndex = null;
+      }
     }
 
     index += markerLength - 1;
@@ -108,6 +114,14 @@ function isSpacingChar(char: string): boolean {
 
 function isLineBreak(char: string): boolean {
   return char === '\n' || char === '\r';
+}
+
+function hasBlankLine(text: string, start: number, end: number): boolean {
+  if (start >= end) {
+    return false;
+  }
+
+  return blankLineRegex.test(text.substring(start, end));
 }
 
 function getFirstNonWhitespaceChar(text: string): string {
@@ -170,6 +184,10 @@ function replaceEmphasisRanges(
 function getUnderscoreEmphasisRanges(text: string, type: MDAstTypes, markerLength: number): TextRange[] {
   return getPositions(type, text).filter((position) => {
     if (position?.start?.offset == null || position?.end?.offset == null) {
+      return false;
+    }
+
+    if (hasBlankLine(text, position.start.offset, position.end.offset)) {
       return false;
     }
 
