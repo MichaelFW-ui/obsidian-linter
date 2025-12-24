@@ -152,3 +152,94 @@ ruleTest({
     },
   ],
 });
+
+describe('Space between CJK and English or numbers', () => {
+  const rule = SpaceBetweenChineseJapaneseOrKoreanAndEnglishOrNumbers.getRule();
+
+  it('handles line breaks between bold segments', () => {
+    const before = dedent`
+      香港的大学体系受英国影响，
+      **教学岗位（Instructor）**与
+      **学术科研岗位（Professor Track）**是
+      **两条不同晋升路径**。
+    `;
+    const after = dedent`
+      香港的大学体系受英国影响，
+      **教学岗位（Instructor）** 与
+      **学术科研岗位（Professor Track）** 是
+      **两条不同晋升路径**。
+    `;
+
+    const once = rule.apply(before);
+    expect(once).toBe(after);
+    expect(rule.apply(once)).toBe(once);
+  });
+
+  it('handles line breaks inside bold segments', () => {
+    const before = dedent`
+      中文**教学岗位（Instructor）
+      与English**中文。
+    `;
+    const after = dedent`
+      中文**教学岗位（Instructor）
+      与 English** 中文。
+    `;
+
+    const once = rule.apply(before);
+    expect(once).toBe(after);
+    expect(rule.apply(once)).toBe(once);
+  });
+
+  it('applies requested spacing around bold segments', () => {
+    const before = dedent`
+      然后 **锁在仓库里不给国民吃** 。
+
+      1. **能用小钱搞定的事情不算事情**。
+
+      你连**核磁共振成像（NMRI）**是什么原理都不知道？
+
+      这是**尊重 STEM 开发者**的路线。
+
+      难道**英文的括号 (english)**也要加空格吗？
+
+      看起来其他符号也**" 可以 "**处理的吧。
+
+      看起来其他符号也**“可以”**处理的吧。
+
+      看起来其他符号也**「可以」**处理的吧。
+
+      看起来其他符号也**【可以】**处理的吧。
+
+      中文**教学english**与**学术english**是**两条 different 路径**。
+
+      香港的大学体系受英国影响，**教学岗位（Instructor）**与**学术科研岗位（Professor Track）**是**两条不同晋升路径**。
+    `;
+    const after = dedent`
+      然后**锁在仓库里不给国民吃**。
+
+      1. **能用小钱搞定的事情不算事情**。
+
+      你连**核磁共振成像（NMRI）** 是什么原理都不知道？
+
+      这是**尊重 STEM 开发者**的路线。
+
+      难道**英文的括号 (english)** 也要加空格吗？
+
+      看起来其他符号也 **" 可以 "** 处理的吧。
+
+      看起来其他符号也 **“可以”** 处理的吧。
+
+      看起来其他符号也 **「可以」** 处理的吧。
+
+      看起来其他符号也 **【可以】** 处理的吧。
+
+      中文**教学 english** 与**学术 english** 是**两条 different 路径**。
+
+      香港的大学体系受英国影响，**教学岗位（Instructor）** 与**学术科研岗位（Professor Track）** 是**两条不同晋升路径**。
+    `;
+
+    const once = rule.apply(before);
+    expect(once).toBe(after);
+    expect(rule.apply(once)).toBe(once);
+  });
+});

@@ -29,6 +29,12 @@ type PositionPlusText = {
   text: string,
 }
 
+type MdastNode = {
+  type: string,
+  position?: Position,
+  children?: MdastNode[],
+}
+
 export enum MDAstTypes {
   Link = 'link',
   Footnote = 'footnoteDefinition',
@@ -617,29 +623,57 @@ export function removeSpacesInLinkText(text: string): string {
   return text;
 }
 
+function getTextPositionsWithinType(text: string, containerType: MDAstTypes): Position[] {
+  const ast = parseTextToAST(text) as MdastNode;
+  const positions: Position[] = [];
+
+  const walk = (node: MdastNode, depth: number): void => {
+    const nextDepth = node.type === containerType ? depth + 1 : depth;
+    if (node.type === (MDAstTypes.Text as string) && depth === 1 && node.position?.start?.offset != null && node.position?.end?.offset != null) {
+      positions.push(node.position);
+    }
+
+    if (!node.children || node.children.length === 0) {
+      return;
+    }
+
+    for (const child of node.children) {
+      walk(child, nextDepth);
+    }
+  };
+
+  walk(ast, 0);
+  positions.sort((a, b) => (b.start.offset ?? 0) - (a.start.offset ?? 0));
+  return positions;
+}
+
 export function updateItalicsText(text: string, func:(text: string) => string): string {
-  const positions: Position[] = getPositions(MDAstTypes.Italics, text);
+  const positions: Position[] = getTextPositionsWithinType(text, MDAstTypes.Italics);
 
   for (const position of positions) {
-    let italicText = text.substring(position.start.offset+1, position.end.offset-1);
+    const startOffset = position.start.offset;
+    const endOffset = position.end.offset;
+    let italicText = text.substring(startOffset, endOffset);
 
     italicText = func(italicText);
 
-    text = replaceTextBetweenStartAndEndWithNewValue(text, position.start.offset+1, position.end.offset-1, italicText);
+    text = replaceTextBetweenStartAndEndWithNewValue(text, startOffset, endOffset, italicText);
   }
 
   return text;
 }
 
 export function updateBoldText(text: string, func:(text: string) => string): string {
-  const positions: Position[] = getPositions(MDAstTypes.Bold, text);
+  const positions: Position[] = getTextPositionsWithinType(text, MDAstTypes.Bold);
 
   for (const position of positions) {
-    let boldText = text.substring(position.start.offset+2, position.end.offset-2);
+    const startOffset = position.start.offset;
+    const endOffset = position.end.offset;
+    let boldText = text.substring(startOffset, endOffset);
 
     boldText = func(boldText);
 
-    text = replaceTextBetweenStartAndEndWithNewValue(text, position.start.offset+2, position.end.offset-2, boldText);
+    text = replaceTextBetweenStartAndEndWithNewValue(text, startOffset, endOffset, boldText);
   }
 
   return text;
