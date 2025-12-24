@@ -150,5 +150,75 @@ ruleTest({
         englishNonLetterCharactersBeforeCJKCharacters: ` \t`,
       },
     },
+    {
+      testName: 'Spaces are added around multiple bold sections without corrupting markdown',
+      before: dedent`
+        香港的大学体系受英国影响，**教学岗位（Instructor）**与**学术科研岗位（Professor Track）**是**两条不同晋升路径**。
+      `,
+      after: dedent`
+        香港的大学体系受英国影响，**教学岗位（Instructor）** 与 **学术科研岗位（Professor Track）** 是 **两条不同晋升路径**。
+      `,
+    },
+    {
+      testName: 'Nested italics inside bold are preserved and spaced',
+      before: dedent`
+        这是**bold *with* italics**测试
+      `,
+      after: dedent`
+        这是 **bold *with* italics** 测试
+      `,
+    },
+    {
+      testName: 'Nested italics inside underline-bold are preserved and spaced',
+      before: dedent`
+        这是__bold _with_ italics__测试
+      `,
+      after: dedent`
+        这是 __bold _with_ italics__ 测试
+      `,
+    },
+    {
+      testName: 'Underscores inside words are not treated as emphasis',
+      before: dedent`
+        foo_bar中文
+      `,
+      after: dedent`
+        foo_bar 中文
+      `,
+    },
   ],
+});
+
+describe('Space between CJK and English stays stable with emphasis', () => {
+  const rule = SpaceBetweenChineseJapaneseOrKoreanAndEnglishOrNumbers.getRule();
+
+  it('does not mutate other parsed content or regress on repeated runs', () => {
+    const input = dedent`
+      香港的大学体系受英国影响，**教学岗位（Instructor）**与**学术科研岗位（Professor Track）**是**两条不同晋升路径**。
+    `;
+    const expected = dedent`
+      香港的大学体系受英国影响，**教学岗位（Instructor）** 与 **学术科研岗位（Professor Track）** 是 **两条不同晋升路径**。
+    `;
+    const once = rule.apply(input, {});
+    const twice = rule.apply(once, {});
+
+    expect(once).toBe(expected);
+    expect(twice).toBe(expected);
+  });
+
+  it('does not corrupt multi-line emphasis and is idempotent', () => {
+    const input = dedent`
+      **bold
+      text**中文A
+    `;
+    const expected = dedent`
+      **bold
+      text**中文 A
+    `;
+    const once = rule.apply(input, {});
+    const twice = rule.apply(once, {});
+
+    expect(once).toBe(expected);
+    expect(twice).toBe(expected);
+  });
 });

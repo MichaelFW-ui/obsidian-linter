@@ -1,13 +1,83 @@
 import {Options, RuleType} from '../rules';
 import RuleBuilder, {ExampleBuilder, OptionBuilderBase, TextOptionBuilder} from './rule-builder';
 import dedent from 'ts-dedent';
-import {ignoreListOfTypes, IgnoreTypes} from '../utils/ignore-types';
-import {updateBoldText, updateItalicsText} from '../utils/mdast';
+import {IgnoreTypes} from '../utils/ignore-types';
 import {escapeRegExp} from '../utils/regex';
 
 class SpaceBetweenChineseJapaneseOrKoreanAndEnglishOrNumbersOptions implements Options {
   englishNonLetterCharactersAfterCJKCharacters?: string = `-+'"([¥$`;
   englishNonLetterCharactersBeforeCJKCharacters?: string = `-+;:'"°%$)]`;
+}
+
+const emphasisRegex = /(\*{3}(?:(?!\*{3})[^\n])+\*{3}|\*{2}(?:(?!\*{2})[^\n])+\*{2}|\*(?:(?!\*)[^\n])+\*|_{3}(?:(?!_{3})[^\n])+_{3}|_{2}(?:(?!_{2})[^\n])+_{2}|_(?:(?!_)[^\n])+_)/g;
+const emphasisPlaceholderPrefix = 'LINTEREMPHPLACEHOLDER';
+
+function shouldHandleEmphasis(match: string, offset: number, fullText: string): boolean {
+  if (!match.startsWith('_')) {
+    return true;
+  }
+
+  const before = offset > 0 ? fullText.charAt(offset - 1) : '';
+  const afterIndex = offset + match.length;
+  const after = afterIndex < fullText.length ? fullText.charAt(afterIndex) : '';
+  const isWordChar = (value: string) => value !== '' && /\w/.test(value);
+
+  return !isWordChar(before) && !isWordChar(after);
+}
+
+function getEmphasisMarker(match: string): string {
+  if (match.startsWith('***')) {
+    return '***';
+  }
+  if (match.startsWith('**')) {
+    return '**';
+  }
+  if (match.startsWith('*')) {
+    return '*';
+  }
+  if (match.startsWith('___')) {
+    return '___';
+  }
+  if (match.startsWith('__')) {
+    return '__';
+  }
+
+  return '_';
+}
+
+function replaceEmphasisWithPlaceholders(text: string, func: (text: string) => string): string {
+  const placeholders: string[] = [];
+
+  text = text.replace(emphasisRegex, (match: string, offset: number, fullText: string) => {
+    if (!shouldHandleEmphasis(match, offset, fullText)) {
+      return match;
+    }
+
+    const token = `${emphasisPlaceholderPrefix}${placeholders.length}`;
+    placeholders.push(match);
+    return token;
+  });
+
+  text = func(text);
+
+  placeholders.forEach((value: string, index: number) => {
+    text = text.replace(`${emphasisPlaceholderPrefix}${index}`, value);
+  });
+
+  return text;
+}
+
+function updateEmphasisText(text: string, func: (text: string) => string): string {
+  return text.replace(emphasisRegex, (match: string, offset: number, fullText: string) => {
+    if (!shouldHandleEmphasis(match, offset, fullText)) {
+      return match;
+    }
+
+    const marker = getEmphasisMarker(match);
+    const inner = match.substring(marker.length, match.length - marker.length);
+    const updatedInner = func(inner);
+    return `${marker}${updatedInner}${marker}`;
+  });
 }
 
 @RuleBuilder.register
@@ -37,13 +107,11 @@ export default class SpaceBetweenChineseJapaneseOrKoreanAndEnglishOrNumbers exte
       return text.replace(head, '$1 $3').replace(tail, '$1 $3');
     };
 
-    let newText = ignoreListOfTypes([IgnoreTypes.italics, IgnoreTypes.bold], text, addSpaceAroundChineseJapaneseKoreanAndEnglish);
+    let newText = replaceEmphasisWithPlaceholders(text, addSpaceAroundChineseJapaneseKoreanAndEnglish);
 
     newText = newText.replace(ignoreExceptionsHead, '$1 $3').replace(ignoreExceptionsTail, '$1 $3');
 
-    newText = updateItalicsText(newText, addSpaceAroundChineseJapaneseKoreanAndEnglish);
-
-    newText = updateBoldText(newText, addSpaceAroundChineseJapaneseKoreanAndEnglish);
+    newText = updateEmphasisText(newText, addSpaceAroundChineseJapaneseKoreanAndEnglish);
 
     return newText;
   }
