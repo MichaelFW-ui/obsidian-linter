@@ -242,4 +242,23 @@ describe('Space between CJK and English or numbers', () => {
     expect(once).toBe(after);
     expect(rule.apply(once)).toBe(once);
   });
+
+  it('restores emphasis placeholders when list markers are present', () => {
+    const before = dedent`
+      2.  **利用你的“Side Project”能力：**
+          既然你擅长 Web、擅长 Rust，能不能把你的论文做成一个**“有着漂亮外壳的平庸内核”**？
+          * 很多时候，评委或导师会被一个完善的**可视化界面（Web）**、一个**极其高效的推理引擎（Rust 重写）**或者一个**很有趣的交互 Demo**所迷惑。
+          * 既然模型 SOTA 不了，那就把**性能**做到极致。在论文里大吹特吹你的系统架构、你的优化手段。这也是工作量，也能毕业。
+    `;
+    const after = dedent`
+      2.  **利用你的“Side Project”能力：**
+          既然你擅长 Web、擅长 Rust，能不能把你的论文做成一个 **“有着漂亮外壳的平庸内核”**？
+          * 很多时候，评委或导师会被一个完善的**可视化界面（Web）**、一个**极其高效的推理引擎（Rust 重写）** 或者一个**很有趣的交互 Demo** 所迷惑。
+          * 既然模型 SOTA 不了，那就把**性能**做到极致。在论文里大吹特吹你的系统架构、你的优化手段。这也是工作量，也能毕业。
+    `;
+
+    const once = rule.apply(before);
+    expect(once).toBe(after);
+    expect(rule.apply(once)).toBe(once);
+  });
 });

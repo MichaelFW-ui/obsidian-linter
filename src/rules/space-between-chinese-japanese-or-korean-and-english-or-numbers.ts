@@ -229,7 +229,8 @@ function replaceEmphasisSegments(text: string): {text: string, replacements: Emp
 
 function restoreEmphasisSegments(text: string, replacements: EmphasisReplacement[]): string {
   let updatedText = text;
-  for (const replacement of replacements) {
+  for (let index = replacements.length - 1; index >= 0; index--) {
+    const replacement = replacements[index];
     updatedText = updatedText.replace(replacement.placeholder, () => replacement.value);
   }
 
