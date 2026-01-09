@@ -19,6 +19,13 @@ const emphasisSpacingTriggerRegex = /[()（）"“”「」【】]/;
 const cjkCharRegex = /[\p{sc=Han}\p{sc=Katakana}\p{sc=Hiragana}\p{sc=Hangul}]/u;
 const cjkPunctuationRegex = /[。！？；：、，]/;
 const blankLineRegex = /\r?\n[ \t]*\r?\n/;
+const localWikiLinkRegex = /!?\[\[(?:[^\]\r\n]|](?!\]))+\]\]/g;
+const localWikiLinkPlaceholderPattern = '\\{LINTERWIKILINKPLACEHOLDER\\d+\\}';
+
+type WikiLinkReplacement = {
+  placeholder: string,
+  value: string,
+}
 
 function isEscaped(text: string, index: number): boolean {
   let backslashCount = 0;
@@ -147,6 +154,32 @@ function getLastNonWhitespaceChar(text: string): string {
 
 function buildPlaceholder(index: number): string {
   return `{LINTEREMPHASISPLACEHOLDER${index}}`;
+}
+
+function buildWikiLinkPlaceholder(index: number): string {
+  return `{LINTERWIKILINKPLACEHOLDER${index}}`;
+}
+
+function replaceLocalWikiLinks(text: string): {text: string, replacements: WikiLinkReplacement[]} {
+  const replacements: WikiLinkReplacement[] = [];
+  let placeholderIndex = 0;
+  const updatedText = text.replace(localWikiLinkRegex, (match) => {
+    const placeholder = buildWikiLinkPlaceholder(placeholderIndex++);
+    replacements.push({placeholder, value: match});
+    return placeholder;
+  });
+
+  return {text: updatedText, replacements};
+}
+
+function restoreLocalWikiLinks(text: string, replacements: WikiLinkReplacement[]): string {
+  let updatedText = text;
+  for (let index = replacements.length - 1; index >= 0; index--) {
+    const replacement = replacements[index];
+    updatedText = updatedText.replace(replacement.placeholder, () => replacement.value);
+  }
+
+  return updatedText;
 }
 
 function replaceEmphasisRanges(
@@ -377,13 +410,15 @@ export default class SpaceBetweenChineseJapaneseOrKoreanAndEnglishOrNumbers exte
     const tail = this.buildTailRegex(options.englishNonLetterCharactersBeforeCJKCharacters);
     // inline math, inline code, markdown links, and wiki links are an exception in that even though they are to be ignored we want to keep a space around these types when surrounded by CJK characters
     const regexEscapedIgnoreExceptionPlaceHolders = `${IgnoreTypes.link.placeholder}|${IgnoreTypes.inlineMath.placeholder}|${IgnoreTypes.inlineCode.placeholder}|${IgnoreTypes.wikiLink.placeholder}`.replaceAll('{', '\\{').replaceAll('}', '\\}');
-    const ignoreExceptionsHead = new RegExp(`(\\p{sc=Han}|\\p{sc=Katakana}|\\p{sc=Hiragana}|\\p{sc=Hangul})( *)(${regexEscapedIgnoreExceptionPlaceHolders})`, 'gmu');
-    const ignoreExceptionsTail = new RegExp(`(${regexEscapedIgnoreExceptionPlaceHolders})( *)(\\p{sc=Han}|\\p{sc=Katakana}|\\p{sc=Hiragana}|\\p{sc=Hangul})`, 'gmu');
+    const ignoreExceptionPlaceholders = `${regexEscapedIgnoreExceptionPlaceHolders}|${localWikiLinkPlaceholderPattern}`;
+    const ignoreExceptionsHead = new RegExp(`(\\p{sc=Han}|\\p{sc=Katakana}|\\p{sc=Hiragana}|\\p{sc=Hangul})( *)(${ignoreExceptionPlaceholders})`, 'gmu');
+    const ignoreExceptionsTail = new RegExp(`(${ignoreExceptionPlaceholders})( *)(\\p{sc=Han}|\\p{sc=Katakana}|\\p{sc=Hiragana}|\\p{sc=Hangul})`, 'gmu');
     const addSpaceAroundChineseJapaneseKoreanAndEnglish = function(text: string): string {
       return text.replace(head, '$1 $3').replace(tail, '$1 $3');
     };
 
-    const emphasisReplacements = replaceEmphasisSegments(text);
+    const localWikiLinkReplacements = replaceLocalWikiLinks(text);
+    const emphasisReplacements = replaceEmphasisSegments(localWikiLinkReplacements.text);
     let newText = addSpaceAroundChineseJapaneseKoreanAndEnglish(emphasisReplacements.text);
 
     newText = newText.replace(ignoreExceptionsHead, '$1 $3').replace(ignoreExceptionsTail, '$1 $3');
@@ -391,6 +426,7 @@ export default class SpaceBetweenChineseJapaneseOrKoreanAndEnglishOrNumbers exte
     newText = updateItalicsText(newText, addSpaceAroundChineseJapaneseKoreanAndEnglish);
     newText = updateBoldText(newText, addSpaceAroundChineseJapaneseKoreanAndEnglish);
     newText = normalizeBoldSpacing(newText, options);
+    newText = restoreLocalWikiLinks(newText, localWikiLinkReplacements.replacements);
 
     return newText;
   }

@@ -122,6 +122,17 @@ ruleTest({
         ![[流浪地球-1.webp|image title|600]]
       `,
     },
+    {
+      testName: 'Make sure that wiki embed filenames are not modified',
+      before: dedent`
+        ![[视频或者image文件34有数字]]
+        ![[完美网络42 [J0].mp4]]
+      `,
+      after: dedent`
+        ![[视频或者image文件34有数字]]
+        ![[完美网络42 [J0].mp4]]
+      `,
+    },
     { // accounts for https://github.com/platers/obsidian-linter/issues/1036
       testName: 'A dash can be removed from the characters to add space around for before and after CJK characters.',
       before: dedent`
